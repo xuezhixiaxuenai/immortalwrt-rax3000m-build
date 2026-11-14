@@ -1,0 +1,95 @@
+name: Config Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Free disk
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: false
+
+      - name: Clone source
+        run: |
+          git clone --depth 1 -b openwrt-24.10-6.6 \
+            https://github.com/padavanonly/immortalwrt-mt798x-6.6 openwrt
+
+      - name: Test 4 candidate configs
+        run: |
+          cd openwrt
+          curl -fsSL "https://raw.githubusercontent.com/padavanonly/immortalwrt-mt798x-6.6/openwrt-24.10-6.6/defconfig/mt7981-ax3000.config" -o /tmp/def.config
+          echo "defconfig 行数: $(wc -l < /tmp/def.config)"
+          echo "defconfig 设备数: $(grep -c '^CONFIG_TARGET_DEVICE_.*=y' /tmp/def.config)"
+
+          python3 - <<'PY'
+import io
+src = io.open('/tmp/def.config', encoding='utf-8').read().splitlines()
+
+def variant(name):
+    if name == 'A':
+        # 去掉 MULTI_PROFILE + 只留 rax3000m-emmc + 去掉 mt7981 垃圾符号 + 加 filogic
+        out = []
+        for l in src:
+            if l.startswith('CONFIG_TARGET_MULTI_PROFILE'): continue
+            if l.startswith('CONFIG_TARGET_DEVICE_') and 'cmcc_rax3000m-emmc' not in l: continue
+            if l.startswith('CONFIG_TARGET_mediatek_mt7981'): continue
+            out.append(l)
+        i = out.index('CONFIG_TARGET_mediatek=y')
+        out.insert(i + 1, 'CONFIG_TARGET_mediatek_filogic=y')
+        return out
+    if name == 'B':
+        # 保留 MULTI_PROFILE + 只留 rax3000m-emmc + 去掉 mt7981 垃圾符号 + 加 filogic
+        out = []
+        for l in src:
+            if l.startswith('CONFIG_TARGET_DEVICE_') and 'cmcc_rax3000m-emmc' not in l: continue
+            if l.startswith('CONFIG_TARGET_mediatek_mt7981'): continue
+            out.append(l)
+        i = out.index('CONFIG_TARGET_mediatek=y')
+        out.insert(i + 1, 'CONFIG_TARGET_mediatek_filogic=y')
+        return out
+    if name == 'C':
+        # 原样不动
+        return list(src)
+    if name == 'D':
+        # 极简手写
+        return [
+            'CONFIG_TARGET_mediatek=y',
+            'CONFIG_TARGET_mediatek_filogic=y',
+            'CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_cmcc_rax3000m-emmc=y',
+        ]
+
+for n in ['A', 'B', 'C', 'D']:
+    io.open(f'/tmp/cfg_{n}', 'w', encoding='utf-8').write('\n'.join(variant(n)) + '\n')
+PY
+
+          for n in A B C D; do
+            echo "================ 候选 $n ================"
+            cp /tmp/cfg_$n .config
+            make defconfig > /tmp/def_$n.log 2>&1 || echo "!! make defconfig 返回非零"
+            echo "--- 选中的设备 ---"
+            grep -E '^CONFIG_TARGET_DEVICE_.*=y' .config | sed 's/^/    /' || echo "    (无)"
+            echo "--- 子架构 ---"
+            grep -E '^CONFIG_TARGET_mediatek_(filogic|mt7981|mt7622|mt7623|mt7629)=y' .config | sed 's/^/    /' || echo "    (无)"
+            echo "--- MULTI_PROFILE / PER_DEVICE ---"
+            grep -E '^CONFIG_TARGET_(MULTI_PROFILE|PER_DEVICE_ROOTFS)=y' .config | sed 's/^/    /' || echo "    (无)"
+          done
+
+          echo "================ 结论 ================"
+          for n in A B C D; do
+            cp /tmp/cfg_$n .config
+            make defconfig > /dev/null 2>&1 || true
+            if grep -q 'DEVICE_cmcc_rax3000m-emmc=y' .config; then
+              echo "候选 $n: ✅ 能选中 rax3000m-emmc"
+            else
+              echo "候选 $n: ❌ 选不上"
+            fi
+          done
