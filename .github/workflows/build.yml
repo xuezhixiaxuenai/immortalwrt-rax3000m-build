@@ -1,8 +1,6 @@
 name: Build RAX3000M eMMC
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -23,10 +21,14 @@ jobs:
         run: git clone --depth 1 -b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6 openwrt
       - name: Setup feeds
         run: bash "$GITHUB_WORKSPACE/scripts/feeds.sh"
+      - name: Downgrade openlist to 4.1.0
+        run: bash "$GITHUB_WORKSPACE/scripts/openlist.sh"
       - name: Patch channel analysis
         run: bash "$GITHUB_WORKSPACE/scripts/patch.sh"
       - name: Build config
         run: bash "$GITHUB_WORKSPACE/scripts/config.sh"
+      - name: Write package sources and defaults
+        run: bash "$GITHUB_WORKSPACE/scripts/sources.sh"
       - name: Download sources
         run: cd openwrt && (make download -j8 || make download -j1 V=s)
       - name: Compile
