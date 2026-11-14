@@ -1,0 +1,43 @@
+name: Build RAX3000M eMMC
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Clone source
+        run: git clone --depth 1 -b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6 openwrt
+      - name: Setup feeds
+        run: bash "$GITHUB_WORKSPACE/scripts/feeds.sh"
+      - name: Patch channel analysis
+        run: bash "$GITHUB_WORKSPACE/scripts/patch.sh"
+      - name: Build config
+        run: bash "$GITHUB_WORKSPACE/scripts/config.sh"
+      - name: Download sources
+        run: cd openwrt && (make download -j8 || make download -j1 V=s)
+      - name: Compile
+        run: cd openwrt && (make -j$(nproc) || make -j1 V=s)
+      - name: Collect
+        run: |
+          mkdir -p out
+          find openwrt/bin/targets/mediatek -type f \( -name '*rax3000m*' -o -name '*.manifest' -o -name 'sha256sums' \) -exec cp {} out/ \; 2>/dev/null || true
+          ls -lah out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rax3000m-emmc-firmware
+          path: out/
+          retention-days: 30
