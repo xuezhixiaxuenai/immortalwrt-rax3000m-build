@@ -1,0 +1,50 @@
+name: Test openlist build
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Clone source
+        run: git clone --depth 1 -b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6 openwrt
+      - name: Add openlist2 feed
+        run: |
+          cd openwrt
+          echo "src-git openlist2 https://github.com/sbwml/luci-app-openlist2.git;main" >> feeds.conf.default
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+      - name: Downgrade openlist to 4.1.0
+        run: |
+          cd openwrt
+          F=feeds/openlist2/openlist2/Makefile
+          sed -i 's/PKG_VERSION:=4\.2\.9/PKG_VERSION:=4.1.0/' $F
+          sed -i 's/PKG_WEB_VERSION:=4\.2\.9/PKG_WEB_VERSION:=4.1.0/' $F
+          sed -i 's|^PKG_HASH:=.*|PKG_HASH:=cdaf91413fe07b3d8155f644237a839dac09f084e812b25c76effca7dfc1d3f2|' $F
+          sed -i 's|^  HASH:=af0b7214fb3a5c34f27366acf528378d9501e27f6e36d5d9c6533c6fee67e4df|  HASH:=508c5d13bdf9defae749bf10b29353016aa45394fb99af78788fd59805a4ead0|' $F
+          echo '--- 修改后的关键行 ---'
+          grep -nE 'PKG_VERSION|PKG_WEB_VERSION|PKG_HASH|HASH:=' $F
+      - name: Generate config
+        run: bash "$GITHUB_WORKSPACE/scripts/config.sh"
+      - name: Show go version target
+        run: |
+          cd openwrt
+          grep -E 'CONFIG_PACKAGE_(openlist2|luci-app-openlist2)' .config || true
+      - name: Build openlist2 only
+        run: |
+          cd openwrt
+          make package/feeds/openlist2/openlist2/compile -j$(nproc) 2>&1 | tail -80
+      - name: Verify ipk produced
+        run: |
+          find openwrt/bin -name 'openlist2*.ipk' -exec ls -lah {} \;
