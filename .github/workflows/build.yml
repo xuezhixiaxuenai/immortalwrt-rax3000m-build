@@ -21,8 +21,6 @@ jobs:
         run: git clone --depth 1 -b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6 openwrt
       - name: Setup feeds
         run: bash "$GITHUB_WORKSPACE/scripts/feeds.sh"
-      - name: Downgrade openlist to 4.1.0
-        run: bash "$GITHUB_WORKSPACE/scripts/openlist.sh"
       - name: Patch channel analysis
         run: bash "$GITHUB_WORKSPACE/scripts/patch.sh"
       - name: Build config

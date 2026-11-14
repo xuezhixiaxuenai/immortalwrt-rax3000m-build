@@ -26,8 +26,8 @@ extra = '''
 CONFIG_PACKAGE_luci-app-store=y
 CONFIG_PACKAGE_luci-lib-taskd=y
 CONFIG_PACKAGE_luci-lib-xterm=y
-CONFIG_PACKAGE_luci-app-openlist2=y
-CONFIG_PACKAGE_openlist2=y
+CONFIG_PACKAGE_luci-app-openlist=y
+CONFIG_PACKAGE_openlist=y
 CONFIG_PACKAGE_luci-app-lucky=y
 CONFIG_PACKAGE_lucky=y
 CONFIG_PACKAGE_luci-app-ttyd=y
@@ -56,7 +56,7 @@ CONFIG_PACKAGE_luci-i18n-ddns-zh-cn=y
 CONFIG_PACKAGE_luci-i18n-wrtbwmon-zh-cn=y
 CONFIG_PACKAGE_luci-i18n-turboacc-mtk-zh-cn=y
 CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn=y
-CONFIG_PACKAGE_luci-i18n-openlist2-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-openlist-zh-cn=y
 CONFIG_PACKAGE_luci-i18n-lucky-zh-cn=y
 CONFIG_PACKAGE_luci-i18n-store-zh-cn=y
 '''.strip().splitlines()
@@ -69,5 +69,7 @@ PY
 make defconfig
 echo '--- 设备 ---'
 grep -E '^CONFIG_TARGET_DEVICE.*=y' .config || true
+echo '--- 关键包 ---'
+grep -E '^CONFIG_PACKAGE_(openlist|lucky|luci-app-openlist|luci-app-lucky|luci-app-store)=' .config || true
 echo '--- 主题 ---'
 grep -E '^CONFIG_PACKAGE_luci-theme.*=y' .config || true
